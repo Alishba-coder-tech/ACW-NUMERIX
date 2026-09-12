@@ -1,76 +1,122 @@
 """
 cost_analysis.py — Cost Reduction Analysis for NumeriX ACW
 ==============================================================
-Drop this file into: numerix/backend/  (same folder as run_experiment.py)
 
-WHAT THIS DOES
----------------
-Reads the MEASURED token counts from acw_experiment_results.json (produced
-by run_experiment.py — run that first) and:
+Reads the latest measured token counts from:
+    acw_experiment_results_v2.json
 
-  1. Computes measured token reduction % per strategy (this part is real data)
-  2. Projects hypothetical $ savings at a few deployment volumes, using a
-     pricing constant YOU must fill in / verify (this part is clearly
-     labeled as an ESTIMATE, not measured data — do not present it as
-     experimental results in your paper; present it as a "practical
-     implication" discussion, per your outline)
+The script:
+  1. Reports measured token usage and token reduction.
+  2. Projects hypothetical monthly input/context-token costs.
+  3. Estimates monthly savings versus the baseline.
 
-Formula used (as specified in the assignment):
-    Cost Saving (%) ≈ Token Reduction (%)
-This holds because commercial LLM APIs bill per input token, and ACW only
-reduces INPUT tokens (the retrieved context) — output tokens are unaffected,
-so this is an approximation, not an exact accounting identity. Say so in the
-paper.
-
-BEFORE RUNNING
---------------
-Edit PRICE_PER_1K_INPUT_TOKENS below to match current pricing for whatever
-model your paper targets (Gemini 2.5 Flash, GPT-4o-mini, etc.) — check the
-provider's pricing page at the time you write the paper, since prices change.
-Example (illustrative only, verify before citing):
-    https://ai.google.dev/gemini-api/docs/pricing
-    https://openai.com/api/pricing
+IMPORTANT:
+- Token-reduction results are measured experimental results.
+- Dollar figures are hypothetical estimates based on the price constant below.
+- Verify the provider's current pricing before using any dollar figure
+  in a research paper.
+- The cost projection considers context/input tokens only. It does not
+  represent the total API bill, which can also include query, system,
+  cached, and output tokens depending on the provider.
 
 USAGE
 -----
-    python run_experiment.py        # first, to generate acw_experiment_results.json
+From numerix/backend/:
+
+    python run_experiment.py
     python cost_analysis.py
 """
 
 import json
+from pathlib import Path
 
-# ─── EDIT ME: pricing is an estimate, not measured — verify before publishing ──
-PRICE_PER_1K_INPUT_TOKENS_USD = 0.000075   # <-- placeholder, e.g. Gemini 2.5 Flash input tier
+
+# ---------------------------------------------------------------------------
+# Pricing assumption
+# ---------------------------------------------------------------------------
+# This is a PLACEHOLDER only. Verify the current price for the model/provider
+# used in the paper before citing any dollar amount.
+PRICE_PER_1K_INPUT_TOKENS_USD = 0.000075
+
 PRICING_SOURCE_NOTE = (
-    "Illustrative only — verify current pricing at your provider's pricing "
-    "page before citing a dollar figure in the paper."
+    "Illustrative only — verify current pricing at your provider's "
+    "pricing page before citing a dollar figure in the paper."
 )
 
-# Hypothetical deployment volumes for the discussion table
-QUERY_VOLUMES_PER_MONTH = [1_000, 10_000, 100_000, 1_000_000]
 
-RESULTS_FILE = "acw_experiment_results.json"
+# ---------------------------------------------------------------------------
+# Deployment volumes used only for hypothetical projections
+# ---------------------------------------------------------------------------
+QUERY_VOLUMES_PER_MONTH = [
+    1_000,
+    10_000,
+    100_000,
+    1_000_000,
+]
+
+
+# IMPORTANT: This is the latest experiment file.
+RESULTS_FILE = "acw_experiment_results_v2.json"
 
 
 def load_measured_data():
-    with open(RESULTS_FILE) as f:
+    """Load measured experiment results from the latest JSON file."""
+    results_path = Path(__file__).resolve().parent / RESULTS_FILE
+
+    if not results_path.exists():
+        raise FileNotFoundError(
+            f"Results file not found:\n{results_path}\n\n"
+            "Run run_experiment.py first."
+        )
+
+    with results_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def summarize_strategy(records):
-    ok = [r for r in records if r.get("status") == "ok"]
+    """
+    Calculate averages using only successful experiment records.
+
+    Expected record fields:
+        status
+        tokens_before
+        tokens_after
+        token_reduction_pct
+    """
+    ok = [
+        r for r in records
+        if r.get("status") == "ok"
+        and r.get("tokens_before") is not None
+        and r.get("tokens_after") is not None
+    ]
+
     if not ok:
         return None
+
     n = len(ok)
+
     avg_before = sum(r["tokens_before"] for r in ok) / n
     avg_after = sum(r["tokens_after"] for r in ok) / n
-    avg_reduction_pct = sum(r["token_reduction_pct"] for r in ok) / n
+
+    # Calculate reduction from the averaged token counts rather than averaging
+    # rounded per-query percentages. This gives a consistent aggregate value.
+    if avg_before > 0:
+        reduction_pct = ((avg_before - avg_after) / avg_before) * 100
+    else:
+        reduction_pct = 0.0
+
     return {
         "n": n,
         "avg_tokens_before": avg_before,
         "avg_tokens_after": avg_after,
-        "avg_reduction_pct": avg_reduction_pct,
+        "avg_reduction_pct": reduction_pct,
     }
+
+
+def calculate_monthly_cost(avg_tokens, queries_per_month):
+    """Estimate monthly cost for context/input tokens only."""
+    monthly_tokens = avg_tokens * queries_per_month
+    return (monthly_tokens / 1000) * PRICE_PER_1K_INPUT_TOKENS_USD
 
 
 def main():
@@ -79,71 +125,184 @@ def main():
     print("\n" + "=" * 78)
     print("  Cost Reduction Analysis — NumeriX ACW")
     print("=" * 78)
-    print(f"  Note: {PRICING_SOURCE_NOTE}")
-    print(f"  Assumed price: ${PRICE_PER_1K_INPUT_TOKENS_USD:.6f} per 1K input tokens")
+    print(f"  Results file: {RESULTS_FILE}")
+    print(f"  Pricing note: {PRICING_SOURCE_NOTE}")
+    print(
+        f"  Assumed price: ${PRICE_PER_1K_INPUT_TOKENS_USD:.6f} "
+        "per 1K input tokens"
+    )
     print("=" * 78)
 
+    # -----------------------------------------------------------------------
+    # Summarize each strategy
+    # -----------------------------------------------------------------------
     summaries = {}
+
     for strategy, records in data.items():
+        if not isinstance(records, list):
+            continue
+
         summary = summarize_strategy(records)
+
         if summary:
             summaries[strategy] = summary
 
+    # Keep the paper's expected order when available.
+    ordered_strategies = [
+        strategy
+        for strategy in ("baseline", "moderate", "aggressive")
+        if strategy in summaries
+    ]
+
+    # Add any other strategies that may exist in the JSON.
+    for strategy in summaries:
+        if strategy not in ordered_strategies:
+            ordered_strategies.append(strategy)
+
     baseline = summaries.get("baseline")
+
     if not baseline:
-        print("No baseline data found — run run_experiment.py first.")
+        print("\nERROR: No successful baseline data found.")
+        print("Run run_experiment.py first and check the JSON file.")
         return
 
-    # ── Measured reduction table ─────────────────────────────────────────
-    print(f"\n{'Strategy':<12}{'Avg Tok Before':>16}{'Avg Tok After':>16}{'Reduction %':>14}")
-    print("-" * 60)
-    for strategy, s in summaries.items():
+    # -----------------------------------------------------------------------
+    # Measured token reduction
+    # -----------------------------------------------------------------------
+    print("\nMEASURED EXPERIMENT RESULTS")
+    print("-" * 78)
+    print(
+        f"{'Strategy':<14}"
+        f"{'Successful N':>14}"
+        f"{'Avg Tok Before':>18}"
+        f"{'Avg Tok After':>17}"
+        f"{'Reduction %':>15}"
+    )
+    print("-" * 78)
+
+    for strategy in ordered_strategies:
+        s = summaries[strategy]
+
         print(
-            f"{strategy:<12}{s['avg_tokens_before']:>16.1f}"
-            f"{s['avg_tokens_after']:>16.1f}{s['avg_reduction_pct']:>13.1f}%"
+            f"{strategy:<14}"
+            f"{s['n']:>14}"
+            f"{s['avg_tokens_before']:>18.1f}"
+            f"{s['avg_tokens_after']:>17.1f}"
+            f"{s['avg_reduction_pct']:>14.1f}%"
         )
 
-    # ── Hypothetical monthly cost projection ─────────────────────────────
+    # -----------------------------------------------------------------------
+    # Hypothetical monthly cost projection
+    # -----------------------------------------------------------------------
     print("\n" + "-" * 78)
-    print("  HYPOTHETICAL monthly cost projection (context/input tokens only)")
-    print("  *** Estimate, not experimental data — label clearly in the paper ***")
+    print("HYPOTHETICAL MONTHLY COST PROJECTION")
+    print("(Context/input tokens only — estimate, NOT experimental data)")
     print("-" * 78)
-    header = f"{'Queries/mo':>12}" + "".join(f"{s:>16}" for s in summaries)
+
+    header = f"{'Queries/mo':>14}"
+
+    for strategy in ordered_strategies:
+        header += f"{strategy:>18}"
+
     print(header)
+    print("-" * (14 + 18 * len(ordered_strategies)))
+
     for volume in QUERY_VOLUMES_PER_MONTH:
-        row = f"{volume:>12,}"
-        for strategy, s in summaries.items():
-            monthly_tokens = s["avg_tokens_after"] * volume
-            monthly_cost = (monthly_tokens / 1000) * PRICE_PER_1K_INPUT_TOKENS_USD
-            row += f"{'$' + format(monthly_cost, ',.2f'):>16}"
+        row = f"{volume:>14,}"
+
+        for strategy in ordered_strategies:
+            s = summaries[strategy]
+
+            monthly_cost = calculate_monthly_cost(
+                s["avg_tokens_after"],
+                volume,
+            )
+
+            row += f"{'$' + format(monthly_cost, ',.4f'):>18}"
+
         print(row)
 
-    # ── Savings vs baseline ──────────────────────────────────────────────
+    # -----------------------------------------------------------------------
+    # Estimated dollar savings versus baseline
+    # -----------------------------------------------------------------------
     print("\n" + "-" * 78)
-    print("  Estimated $ saved per month vs. BASELINE (no filtering)")
+    print("ESTIMATED MONTHLY SAVINGS VS. BASELINE")
+    print("(Context/input tokens only — hypothetical estimate)")
     print("-" * 78)
-    header = f"{'Queries/mo':>12}" + "".join(
-        f"{s:>16}" for s in summaries if s != "baseline"
-    )
+
+    non_baseline = [
+        strategy
+        for strategy in ordered_strategies
+        if strategy != "baseline"
+    ]
+
+    header = f"{'Queries/mo':>14}"
+
+    for strategy in non_baseline:
+        header += f"{strategy:>18}"
+
     print(header)
-    baseline_after = baseline["avg_tokens_after"]
+    print("-" * (14 + 18 * len(non_baseline)))
+
+    baseline_avg_after = baseline["avg_tokens_after"]
+
     for volume in QUERY_VOLUMES_PER_MONTH:
-        row = f"{volume:>12,}"
-        for strategy, s in summaries.items():
-            if strategy == "baseline":
-                continue
-            tokens_saved = (baseline_after - s["avg_tokens_after"]) * volume
-            dollars_saved = (tokens_saved / 1000) * PRICE_PER_1K_INPUT_TOKENS_USD
-            row += f"{'$' + format(dollars_saved, ',.2f'):>16}"
+        row = f"{volume:>14,}"
+
+        for strategy in non_baseline:
+            s = summaries[strategy]
+
+            tokens_saved = (
+                baseline_avg_after - s["avg_tokens_after"]
+            ) * volume
+
+            dollars_saved = (
+                tokens_saved / 1000
+            ) * PRICE_PER_1K_INPUT_TOKENS_USD
+
+            row += f"{'$' + format(dollars_saved, ',.4f'):>18}"
+
         print(row)
 
+    # -----------------------------------------------------------------------
+    # Estimated percentage cost saving
+    # -----------------------------------------------------------------------
     print("\n" + "=" * 78)
-    print("  Cost Saving (%) ≈ Token Reduction (%):")
-    for strategy, s in summaries.items():
+    print("ESTIMATED INPUT-COST SAVING")
+    print("For context/input tokens, cost saving approximately follows")
+    print("the measured token reduction.")
+    print("=" * 78)
+
+    for strategy in ordered_strategies:
         if strategy == "baseline":
             continue
-        print(f"    {strategy:<12} → ~{s['avg_reduction_pct']:.1f}% estimated cost saving")
-    print("=" * 78 + "\n")
+
+        s = summaries[strategy]
+
+        print(
+            f"  {strategy:<14} → "
+            f"~{s['avg_reduction_pct']:.1f}% estimated "
+            "context/input-token cost saving"
+        )
+
+    print("=" * 78)
+
+    print("\nResearch-paper guidance:")
+    print(
+        "  • Report token reductions as measured experimental results."
+    )
+    print(
+        "  • Report dollar projections only as hypothetical practical "
+        "implications."
+    )
+    print(
+        "  • Verify current provider pricing before citing dollar amounts."
+    )
+    print(
+        "  • Do not describe the projected dollar figures as measured "
+        "costs."
+    )
+    print()
 
 
 if __name__ == "__main__":

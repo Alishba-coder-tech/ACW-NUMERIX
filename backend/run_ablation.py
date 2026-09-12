@@ -1,43 +1,19 @@
 """
 run_ablation.py — Ablation Study for the ACW Scoring Function
-=================================================================
-Drop this file into: numerix/backend/  (same folder as run_experiment.py)
 
-WHAT THIS TESTS
-----------------
-Your scoring function is:  combined = alpha * cosine_similarity + (1 - alpha) * density
-This script isolates WHY that particular formulation (alpha = 0.7) works, by
-sweeping:
+Place this file in:
+    numerix/backend/
 
-    cosine_only     (i.e. the original un-modified retrieval ranking)
-    density_only    (i.e. ignore semantic relevance entirely)
-    alpha = 0.3
-    alpha = 0.5
-    alpha = 0.7   <- your paper's chosen value
-    alpha = 0.9
-
-For each config it runs your 30 test queries (strategy="moderate", top-2),
-capturing:
-    - token_reduction_pct       (efficiency side of the trade-off)
-    - answer quality scores     (correctness / relevance / completeness /
-                                  faithfulness, via the same LLM-judge used
-                                  in evaluate_answer_quality.py)
-
-This gives you a single table you can drop straight into an "Ablation
-Study" section: efficiency AND quality, side by side, per configuration.
-
-REQUIRES
---------
-    - acw.py must have the `alpha` / `scoring_mode` parameters (already
-      added if you're using the updated acw.py that ships with this file)
-    - chatbot.py's ChatInput/ask() must forward `alpha` and `scoring_mode`
-      to adaptive_context_wrapper (already added — see the diff notes)
-    - Server running:  uvicorn main:app --reload
-
-USAGE
------
+Run:
     cd numerix/backend
     python run_ablation.py
+
+Requirements:
+    - Server running at http://localhost:8000
+    - acw.py supports alpha/scoring_mode
+    - chatbot.py forwards alpha/scoring_mode
+    - run_experiment.py contains TEST_QUERIES
+    - answer_quality.py contains judge_answer
 """
 
 import json
@@ -47,109 +23,341 @@ from typing import Dict, List
 import requests
 
 from run_experiment import TEST_QUERIES
-from evaluate_answer_quality import judge_answer  # reuse the exact same judge
+from answer_quality import judge_answer   # FIXED: actual file name
 
+
+# API endpoint
 ASK_URL = "http://localhost:8000/api/chatbot/ask"
+
+# Delay between calls
 SLEEP_BETWEEN_CALLS = 1.0
 
-# ─── The configurations being ablated ───────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ABLATION CONFIGURATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+
 CONFIGS = [
-    {"label": "cosine_only",  "scoring_mode": "cosine_only",  "alpha": None},
-    {"label": "density_only", "scoring_mode": "density_only", "alpha": None},
-    {"label": "alpha_0.3",    "scoring_mode": "hybrid",       "alpha": 0.3},
-    {"label": "alpha_0.5",    "scoring_mode": "hybrid",       "alpha": 0.5},
-    {"label": "alpha_0.7",    "scoring_mode": "hybrid",       "alpha": 0.7},  # your paper's value
-    {"label": "alpha_0.9",    "scoring_mode": "hybrid",       "alpha": 0.9},
+    {
+        "label": "cosine_only",
+        "scoring_mode": "cosine_only",
+        "alpha": None,
+    },
+    {
+        "label": "density_only",
+        "scoring_mode": "density_only",
+        "alpha": None,
+    },
+    {
+        "label": "alpha_0.3",
+        "scoring_mode": "hybrid",
+        "alpha": 0.3,
+    },
+    {
+        "label": "alpha_0.5",
+        "scoring_mode": "hybrid",
+        "alpha": 0.5,
+    },
+    {
+        "label": "alpha_0.7",
+        "scoring_mode": "hybrid",
+        "alpha": 0.7,
+    },
+    {
+        "label": "alpha_0.9",
+        "scoring_mode": "hybrid",
+        "alpha": 0.9,
+    },
 ]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ASK CHATBOT
+# ─────────────────────────────────────────────────────────────────────────────
+
 def ask_chatbot(query: str, config: Dict) -> Dict:
+
     payload = {
         "message": query,
         "history": [],
-        "strategy": "moderate",           # top-2, token-budgeted — where scoring matters most
+        "strategy": "moderate",
         "alpha": config["alpha"],
         "scoring_mode": config["scoring_mode"],
     }
-    try:
-        resp = requests.post(ASK_URL, json=payload, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        return {"reply": "", "sources": [], "acw_metrics": {}, "error": str(e)}
 
+    try:
+        response = requests.post(
+            ASK_URL,
+            json=payload,
+            timeout=60,
+        )
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except Exception as e:
+
+        return {
+            "reply": "",
+            "sources": [],
+            "acw_metrics": {},
+            "error": str(e),
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAFE AVERAGE
+# ─────────────────────────────────────────────────────────────────────────────
+
+def average(rows: List[Dict], key: str):
+
+    values = [
+        row.get(key)
+        for row in rows
+        if isinstance(row.get(key), (int, float))
+    ]
+
+    if not values:
+        return None
+
+    return sum(values) / len(values)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
+
     all_results: List[Dict] = []
+
     total = len(CONFIGS) * len(TEST_QUERIES)
     done = 0
 
+    print("=" * 100)
+    print("ACW SCORING FUNCTION — ABLATION STUDY")
+    print("=" * 100)
+
+    print(f"Configurations : {len(CONFIGS)}")
+    print(f"Test queries   : {len(TEST_QUERIES)}")
+    print(f"Total runs     : {total}")
+
+    print("=" * 100)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # RUN EACH CONFIGURATION
+    # ─────────────────────────────────────────────────────────────────────────
+
     for config in CONFIGS:
+
         print(f"\n--- Config: {config['label']} ---")
+
         for query in TEST_QUERIES:
+
             done += 1
+
             chat_resp = ask_chatbot(query, config)
+
             answer = chat_resp.get("reply", "")
             metrics = chat_resp.get("acw_metrics", {})
 
-            if not answer:
-                print(f"  [{done:03d}/{total}] SKIP (no answer) — {query[:40]}")
+            # Request failed
+            if chat_resp.get("error"):
+
+                print(
+                    f"[{done:03d}/{total}] "
+                    f"ERROR: {chat_resp['error']}"
+                )
+
                 continue
 
-            scores = judge_answer(query, answer)
+            # No answer
+            if not answer:
+
+                print(
+                    f"[{done:03d}/{total}] "
+                    f"SKIP — no answer — {query[:40]}"
+                )
+
+                continue
+
+            # ─────────────────────────────────────────────────────────────────
+            # LLM JUDGE
+            # ─────────────────────────────────────────────────────────────────
+
+            try:
+
+                scores = judge_answer(
+                    query,
+                    answer
+                )
+
+            except Exception as e:
+
+                print(
+                    f"[{done:03d}/{total}] "
+                    f"JUDGE ERROR: {e}"
+                )
+
+                continue
+
+            # ─────────────────────────────────────────────────────────────────
+            # SAVE RESULT
+            # ─────────────────────────────────────────────────────────────────
+
             record = {
                 "config": config["label"],
                 "query": query,
-                "token_reduction_pct": metrics.get("token_reduction_pct"),
-                "chunks_selected": metrics.get("chunks_selected"),
+
+                "token_reduction_pct": metrics.get(
+                    "token_reduction_pct"
+                ),
+
+                "chunks_selected": metrics.get(
+                    "chunks_selected"
+                ),
+
                 **scores,
             }
+
             all_results.append(record)
+
             print(
-                f"  [{done:03d}/{total}] reduction={metrics.get('token_reduction_pct')}%  "
-                f"correctness={scores.get('correctness')}  "
-                f"faithfulness={scores.get('faithfulness')}  | {query[:35]}"
+                f"[{done:03d}/{total}] "
+                f"reduction={record['token_reduction_pct']}%  "
+                f"correctness={record.get('correctness')}  "
+                f"relevance={record.get('relevance')}  "
+                f"completeness={record.get('completeness')}  "
+                f"faithfulness={record.get('faithfulness')}  "
+                f"| {query[:30]}"
             )
+
             time.sleep(SLEEP_BETWEEN_CALLS)
 
-    with open("ablation_results.json", "w") as f:
-        json.dump(all_results, f, indent=2)
+    # ─────────────────────────────────────────────────────────────────────────
+    # SAVE RESULTS
+    # ─────────────────────────────────────────────────────────────────────────
 
-    # ── Summary table: this answers "why alpha=0.7" ─────────────────────
-    print("\n" + "=" * 100)
-    print("  ACW Scoring Function — Ablation Study")
-    print("=" * 100)
-    header = (
-        f"{'Config':<14}{'Avg Reduction %':>17}{'Correctness':>14}"
-        f"{'Relevance':>12}{'Completeness':>14}{'Faithfulness':>14}"
-    )
-    print(header)
-    print("-" * 100)
-    for config in CONFIGS:
-        label = config["label"]
-        rows = [r for r in all_results if r["config"] == label and r.get("correctness") is not None]
-        if not rows:
-            continue
-        n = len(rows)
-        avg = lambda k: sum(r[k] for r in rows) / n
-        print(
-            f"{label:<14}{avg('token_reduction_pct'):>16.1f}%{avg('correctness'):>14.2f}"
-            f"{avg('relevance'):>12.2f}{avg('completeness'):>14.2f}{avg('faithfulness'):>14.2f}"
+    output_file = "ablation_results.json"
+
+    with open(
+        output_file,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            all_results,
+            f,
+            indent=2,
+            ensure_ascii=False,
         )
-    print("=" * 100)
-    print(
-        "Interpretation guide:\n"
-        "  - cosine_only  → shows the ceiling on quality when relevance is the only signal\n"
-        "                   (but keeps redundant/verbose chunks -> less reduction)\n"
-        "  - density_only → shows what happens when semantic relevance is ignored\n"
-        "                   (expect correctness/relevance to drop the most here)\n"
-        "  - alpha sweep  → shows where quality starts degrading as density is weighted\n"
-        "                   more heavily; the paper's alpha=0.7 should sit at or near\n"
-        "                   the best reduction-vs-quality trade-off, not necessarily the\n"
-        "                   single highest quality score (that's expected to be cosine_only\n"
-        "                   or a high alpha, at the cost of reduction).\n"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SUMMARY TABLE
+    # ─────────────────────────────────────────────────────────────────────────
+
+    print("\n")
+    print("=" * 110)
+    print("ACW SCORING FUNCTION — ABLATION STUDY RESULTS")
+    print("=" * 110)
+
+    header = (
+        f"{'Config':<16}"
+        f"{'N':>5}"
+        f"{'Reduction %':>16}"
+        f"{'Correctness':>15}"
+        f"{'Relevance':>13}"
+        f"{'Completeness':>15}"
+        f"{'Faithfulness':>15}"
     )
-    print("Saved: ablation_results.json\n")
+
+    print(header)
+    print("-" * 110)
+
+    for config in CONFIGS:
+
+        label = config["label"]
+
+        rows = [
+            r
+            for r in all_results
+            if r["config"] == label
+        ]
+
+        if not rows:
+
+            print(f"{label:<16} No results")
+            continue
+
+        reduction = average(
+            rows,
+            "token_reduction_pct"
+        )
+
+        correctness = average(
+            rows,
+            "correctness"
+        )
+
+        relevance = average(
+            rows,
+            "relevance"
+        )
+
+        completeness = average(
+            rows,
+            "completeness"
+        )
+
+        faithfulness = average(
+            rows,
+            "faithfulness"
+        )
+
+        def fmt(value):
+
+            if value is None:
+                return "N/A"
+
+            return f"{value:.2f}"
+
+        reduction_text = (
+            "N/A"
+            if reduction is None
+            else f"{reduction:.1f}%"
+        )
+
+        print(
+            f"{label:<16}"
+            f"{len(rows):>5}"
+            f"{reduction_text:>16}"
+            f"{fmt(correctness):>15}"
+            f"{fmt(relevance):>13}"
+            f"{fmt(completeness):>15}"
+            f"{fmt(faithfulness):>15}"
+        )
+
+    print("=" * 110)
+
+    print(
+        "\nInterpretation:\n"
+        "  cosine_only  -> cosine similarity only\n"
+        "  density_only -> density only\n"
+        "  alpha=0.3    -> stronger density weighting\n"
+        "  alpha=0.5    -> equal cosine/density weighting\n"
+        "  alpha=0.7    -> proposed configuration\n"
+        "  alpha=0.9    -> stronger cosine weighting\n"
+    )
+
+    print(
+        "The ablation compares answer quality against "
+        "token reduction to evaluate the quality-efficiency trade-off."
+    )
+
+    print(f"\nSaved: {output_file}")
+    print(f"Successful experiments: {len(all_results)}/{total}")
 
 
 if __name__ == "__main__":

@@ -1,47 +1,22 @@
 """
-evaluate_answer_quality.py — Answer Quality / Accuracy Evaluation for NumeriX ACW
-===================================================================================
-Drop this file into: numerix/backend/  (same folder as run_experiment.py)
+answer_quality.py — Answer Quality / Accuracy Evaluation for NumeriX ACW
+=========================================================================
 
-WHY THIS EXISTS
-----------------
-run_experiment.py proves ACW saves tokens. It does NOT prove the saved
-tokens don't hurt answer quality. This script closes that gap using an
-LLM-as-judge (a well-established approach for RAG evaluation, e.g. RAGAS).
+Evaluates whether ACW token reduction affects answer quality.
 
-For every query, for every strategy (baseline / moderate / aggressive), it:
-  1. Calls your running FastAPI server's /api/chatbot/ask endpoint
-  2. Sends the question + the model's answer to a judge LLM (Gemini),
-     along with the FULL NumeriX knowledge base as ground truth
-  3. Asks the judge to score 1-5 on: correctness, relevance,
-     completeness, faithfulness (the exact table from your paper outline)
-  4. Averages the scores per strategy and prints/saves a comparison table
+For every query and strategy:
+    1. Calls the running FastAPI chatbot.
+    2. Sends the chatbot answer to a Gemini judge.
+    3. Scores:
+       - correctness
+       - relevance
+       - completeness
+       - faithfulness
+    4. Saves detailed results and prints averages.
 
-This directly answers: "Does saving tokens (moderate/aggressive) hurt
-answer quality compared to baseline?"
-
-SETUP
------
-    cd numerix/backend
-    pip install requests google-generativeai python-dotenv
-    # GOOGLE_API_KEY must already be set (it's used by chatbot.py too)
-    # Start your server first:  uvicorn main:app --reload
-    python evaluate_answer_quality.py
-
-OPTIONAL — HUMAN EVALUATION
------------------------------
-Even the paper's own note says "a human evaluation ... would substantially
-strengthen the paper." This script also writes answer_quality_for_human_review.csv
-so you (or classmates) can independently score a sample by hand and report
-inter-rater agreement alongside the automated scores — reviewers like seeing
-both.
-
-OUTPUT
-------
-  answer_quality_results.json           — full per-query judge scores
-  answer_quality_for_human_review.csv   — same data, spreadsheet-friendly,
-                                            with blank columns for a human rater
-Printed to console: the Metric x Strategy summary table for your paper.
+Outputs:
+    answer_quality_results.json
+    answer_quality_for_human_review.csv
 """
 
 import csv
@@ -52,58 +27,145 @@ from typing import Dict, List
 
 import requests
 
+# ─────────────────────────────────────────────────────────────────────
+# Load variables from .env
+# ─────────────────────────────────────────────────────────────────────
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    raise SystemExit(
+        "python-dotenv is not installed.\n"
+        "Run: pip install python-dotenv"
+    )
+
+load_dotenv()
+
+# ─────────────────────────────────────────────────────────────────────
+# Gemini
+# ─────────────────────────────────────────────────────────────────────
+
 try:
     import google.generativeai as genai
 except ImportError:
-    raise SystemExit("Run: pip install google-generativeai")
+    raise SystemExit(
+        "google-generativeai is not installed.\n"
+        "Run: pip install google-generativeai"
+    )
 
-from run_experiment import TEST_QUERIES  # reuse the same 30 queries you already validated
+# ─────────────────────────────────────────────────────────────────────
+# Reuse the same test queries
+# ─────────────────────────────────────────────────────────────────────
 
-# ─── Config ───────────────────────────────────────────────────────────────
+from run_experiment import TEST_QUERIES
+
+# ─────────────────────────────────────────────────────────────────────
+# Configuration
+# ─────────────────────────────────────────────────────────────────────
+
 ASK_URL = "http://localhost:8000/api/chatbot/ask"
-STRATEGIES = ["baseline", "moderate", "aggressive"]
 
-# Judge model: use a *different/stronger* model than the chatbot where possible
-# to reduce self-grading bias. gemini-2.5-pro is a good default if you have
-# quota; fall back to gemini-2.5-flash if you're rate-limited.
-JUDGE_MODEL = os.environ.get("ACW_JUDGE_MODEL", "gemini-2.5-pro")
+STRATEGIES = [
+    "baseline",
+    "moderate",
+    "aggressive"
+]
 
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise SystemExit("GOOGLE_API_KEY is not set in your environment/.env")
-genai.configure(api_key=GOOGLE_API_KEY)
-_judge = genai.GenerativeModel(JUDGE_MODEL)
+# Judge model
+# Can be overridden in .env:
+# ACW_JUDGE_MODEL=gemini-3.5-flash-lite
 
-SLEEP_BETWEEN_CALLS = 1.0  # be polite to both your API and the judge API
-
-# ─── Ground truth: reuse the SAME knowledge base your chatbot retrieves from ──
-# Importing straight from chatbot.py guarantees the judge's "ground truth"
-# never drifts out of sync with what the chatbot can actually say.
-from routers.chatbot import KNOWLEDGE_BASE  # noqa: E402
-
-REFERENCE_TEXT = "\n\n".join(
-    f"[{c['title']}]\n{c['content']}" for c in KNOWLEDGE_BASE
+JUDGE_MODEL = os.environ.get(
+    "ACW_JUDGE_MODEL",
+    "gemini-3.5-flash-lite"
 )
 
-JUDGE_PROMPT_TEMPLATE = """You are an impartial evaluator grading a tutoring chatbot's answer.
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    raise SystemExit(
+        "GOOGLE_API_KEY is not set in your environment/.env"
+    )
+
+genai.configure(api_key=GOOGLE_API_KEY)
+
+_judge = genai.GenerativeModel(JUDGE_MODEL)
+
+# Delay between API calls
+SLEEP_BETWEEN_CALLS = 1.5
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Knowledge Base
+# ─────────────────────────────────────────────────────────────────────
+
+from routers.chatbot import KNOWLEDGE_BASE
+
+REFERENCE_TEXT = "\n\n".join(
+    f"[{c['title']}]\n{c['content']}"
+    for c in KNOWLEDGE_BASE
+)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Judge Prompt
+# ─────────────────────────────────────────────────────────────────────
+
+JUDGE_PROMPT_TEMPLATE = """
+You are an impartial evaluator grading a tutoring chatbot's answer.
 
 You are given:
-1. QUESTION — a student's question
-2. REFERENCE MATERIAL — the complete, authoritative knowledge base the chatbot
-   is built on (the correct answer must be consistent with this, but the
-   chatbot only ever sees a filtered SUBSET of it — that is what we are testing)
-3. ANSWER — what the chatbot actually replied
 
-Score the ANSWER from 1 (very poor) to 5 (excellent) on each of these,
-independently:
+1. QUESTION — the student's question.
 
-- correctness: Are the facts in the answer accurate and consistent with the reference material?
-- relevance: Does the answer actually address what the question asked?
-- completeness: Does the answer cover the key points a good answer should include?
-- faithfulness: Does the answer avoid inventing details not supported by the reference material (no hallucination)?
+2. REFERENCE MATERIAL — the complete authoritative knowledge base
+   used by the NumeriX chatbot.
 
-Respond with ONLY a JSON object, no markdown fences, no commentary:
-{{"correctness": <1-5>, "relevance": <1-5>, "completeness": <1-5>, "faithfulness": <1-5>, "notes": "<one short sentence>"}}
+3. ANSWER — the answer produced by the chatbot.
+
+The chatbot may only receive a filtered subset of the reference material.
+The purpose of this evaluation is to determine whether context reduction
+affects answer quality.
+
+Score the ANSWER from 1 to 5 on each metric.
+
+SCORING:
+
+correctness:
+Are the facts accurate and consistent with the reference material?
+
+relevance:
+Does the answer directly address the student's question?
+
+completeness:
+Does the answer include the important information needed to answer
+the question properly?
+
+faithfulness:
+Does the answer avoid unsupported claims or hallucinations and remain
+faithful to the reference material?
+
+Use:
+
+1 = Very poor
+2 = Poor
+3 = Acceptable
+4 = Good
+5 = Excellent
+
+Respond with ONLY a valid JSON object.
+Do not use markdown.
+Do not include commentary outside the JSON.
+
+Required format:
+
+{{
+  "correctness": <1-5>,
+  "relevance": <1-5>,
+  "completeness": <1-5>,
+  "faithfulness": <1-5>,
+  "notes": "<one short sentence>"
+}}
 
 QUESTION:
 {question}
@@ -116,118 +178,347 @@ ANSWER:
 """
 
 
-def judge_answer(question: str, answer: str, retries: int = 2) -> Dict:
-    """Calls the judge LLM and parses its JSON score. Never raises — returns
-    a dict with an 'error' key on failure so a bad call doesn't kill a run."""
+# ─────────────────────────────────────────────────────────────────────
+# Judge one answer
+# ─────────────────────────────────────────────────────────────────────
+
+def judge_answer(
+    question: str,
+    answer: str,
+    retries: int = 2
+) -> Dict:
+
     prompt = JUDGE_PROMPT_TEMPLATE.format(
-        question=question, reference=REFERENCE_TEXT, answer=answer
+        question=question,
+        reference=REFERENCE_TEXT,
+        answer=answer
     )
+
     for attempt in range(retries + 1):
+
         try:
-            resp = _judge.generate_content(prompt)
-            text = resp.text.strip()
-            # Strip accidental ```json fences
+
+            response = _judge.generate_content(prompt)
+
+            text = response.text.strip()
+
+            # Remove accidental markdown fences
             if text.startswith("```"):
+
                 text = text.strip("`")
-                text = text.split("\n", 1)[1] if "\n" in text else text
-                text = text.rsplit("```", 1)[0]
+
+                if "\n" in text:
+                    text = text.split("\n", 1)[1]
+
+                if "```" in text:
+                    text = text.rsplit("```", 1)[0]
+
+                text = text.strip()
+
             data = json.loads(text)
-            for key in ("correctness", "relevance", "completeness", "faithfulness"):
-                data[key] = float(data.get(key, 0))
+
+            # Validate / convert scores
+            for key in (
+                "correctness",
+                "relevance",
+                "completeness",
+                "faithfulness"
+            ):
+
+                data[key] = float(
+                    data.get(key, 0)
+                )
+
             return data
+
         except Exception as e:
-            if attempt == retries:
+
+            # Retry if attempts remain
+            if attempt < retries:
+
+                print(
+                    f"\nJudge attempt "
+                    f"{attempt + 1}/{retries + 1} failed:"
+                )
+
+                print(e)
+                print("Retrying...\n")
+
+                time.sleep(3)
+
+            # Final failure — SHOW ACTUAL ERROR
+            else:
+
+                print("\n" + "=" * 70)
+                print("JUDGE ERROR")
+                print("=" * 70)
+                print(f"Model: {JUDGE_MODEL}")
+                print(f"Error: {e}")
+                print("=" * 70 + "\n")
+
                 return {
-                    "correctness": None, "relevance": None,
-                    "completeness": None, "faithfulness": None,
-                    "error": str(e),
+                    "correctness": None,
+                    "relevance": None,
+                    "completeness": None,
+                    "faithfulness": None,
+                    "error": str(e)
                 }
-            time.sleep(2)
 
 
-def ask_chatbot(query: str, strategy: str) -> Dict:
-    payload = {"message": query, "history": [], "strategy": strategy}
+# ─────────────────────────────────────────────────────────────────────
+# Ask chatbot
+# ─────────────────────────────────────────────────────────────────────
+
+def ask_chatbot(
+    query: str,
+    strategy: str
+) -> Dict:
+
+    payload = {
+        "message": query,
+        "history": [],
+        "strategy": strategy
+    }
+
     try:
-        resp = requests.post(ASK_URL, json=payload, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        return {"reply": "", "sources": [], "acw_metrics": {}, "error": str(e)}
 
+        response = requests.post(
+            ASK_URL,
+            json=payload,
+            timeout=30
+        )
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except Exception as e:
+
+        print("\nCHATBOT ERROR:")
+        print(e)
+        print()
+
+        return {
+            "reply": "",
+            "sources": [],
+            "acw_metrics": {},
+            "error": str(e)
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Main evaluation
+# ─────────────────────────────────────────────────────────────────────
 
 def main():
+
     all_results: List[Dict] = []
+
     total = len(TEST_QUERIES) * len(STRATEGIES)
+
     done = 0
 
+    print()
+    print("=" * 78)
+    print(" NumeriX ACW — Answer Quality Evaluation")
+    print("=" * 78)
+    print(f" Judge model: {JUDGE_MODEL}")
+    print(f" Queries: {len(TEST_QUERIES)}")
+    print(f" Strategies: {len(STRATEGIES)}")
+    print(f" Total evaluations: {total}")
+    print("=" * 78)
+
     for strategy in STRATEGIES:
-        print(f"\n--- Evaluating strategy: {strategy.upper()} ---")
+
+        print()
+        print(
+            f"--- Evaluating strategy: "
+            f"{strategy.upper()} ---"
+        )
+
         for query in TEST_QUERIES:
+
             done += 1
-            chat_resp = ask_chatbot(query, strategy)
-            answer = chat_resp.get("reply", "")
+
+            chat_resp = ask_chatbot(
+                query,
+                strategy
+            )
+
+            answer = chat_resp.get(
+                "reply",
+                ""
+            )
 
             if not answer:
-                print(f"  [{done:03d}/{total}] SKIP (no answer) — {query[:40]}")
+
+                print(
+                    f"[{done:02d}/{total}] "
+                    f"SKIP — no chatbot answer — "
+                    f"{query[:50]}"
+                )
+
                 continue
 
-            scores = judge_answer(query, answer)
+            scores = judge_answer(
+                query,
+                answer
+            )
+
             record = {
                 "query": query,
                 "strategy": strategy,
                 "answer": answer,
-                "acw_metrics": chat_resp.get("acw_metrics", {}),
-                **scores,
+                "acw_metrics": chat_resp.get(
+                    "acw_metrics",
+                    {}
+                ),
+                **scores
             }
+
             all_results.append(record)
+
             print(
-                f"  [{done:03d}/{total}] correctness={scores.get('correctness')} "
-                f"relevance={scores.get('relevance')} "
-                f"completeness={scores.get('completeness')} "
-                f"faithfulness={scores.get('faithfulness')}  | {query[:40]}"
+                f"[{done:02d}/{total}] "
+                f"correctness="
+                f"{scores.get('correctness')} "
+                f"relevance="
+                f"{scores.get('relevance')} "
+                f"completeness="
+                f"{scores.get('completeness')} "
+                f"faithfulness="
+                f"{scores.get('faithfulness')} "
+                f"| {query[:45]}"
             )
-            time.sleep(SLEEP_BETWEEN_CALLS)
 
-    # ── Save raw results ─────────────────────────────────────────────────
-    with open("answer_quality_results.json", "w") as f:
-        json.dump(all_results, f, indent=2)
+            time.sleep(
+                SLEEP_BETWEEN_CALLS
+            )
 
-    # ── CSV for optional human review (blank human_* columns to fill in) ──
-    with open("answer_quality_for_human_review.csv", "w", newline="", encoding="utf-8") as f:
+
+    # ────────────────────────────────────────────────────────────────
+    # Save JSON
+    # ────────────────────────────────────────────────────────────────
+
+    with open(
+        "answer_quality_results.json",
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            all_results,
+            f,
+            indent=2,
+            ensure_ascii=False
+        )
+
+
+    # ────────────────────────────────────────────────────────────────
+    # Save CSV for human evaluation
+    # ────────────────────────────────────────────────────────────────
+
+    with open(
+        "answer_quality_for_human_review.csv",
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as f:
+
         writer = csv.writer(f)
+
         writer.writerow([
-            "query", "strategy", "answer",
-            "llm_correctness", "llm_relevance", "llm_completeness", "llm_faithfulness",
-            "human_correctness", "human_relevance", "human_completeness", "human_faithfulness",
+            "query",
+            "strategy",
+            "answer",
+            "llm_correctness",
+            "llm_relevance",
+            "llm_completeness",
+            "llm_faithfulness",
+            "human_correctness",
+            "human_relevance",
+            "human_completeness",
+            "human_faithfulness"
         ])
-        for r in all_results:
+
+        for result in all_results:
+
             writer.writerow([
-                r["query"], r["strategy"], r["answer"],
-                r.get("correctness"), r.get("relevance"),
-                r.get("completeness"), r.get("faithfulness"),
-                "", "", "", "",
+                result["query"],
+                result["strategy"],
+                result["answer"],
+                result.get("correctness"),
+                result.get("relevance"),
+                result.get("completeness"),
+                result.get("faithfulness"),
+                "",
+                "",
+                "",
+                ""
             ])
 
-    # ── Summary table (this is your Section 5 table) ────────────────────
-    print("\n" + "=" * 78)
-    print("  Answer Quality Summary  (1-5 scale, LLM-as-judge)")
+
+    # ────────────────────────────────────────────────────────────────
+    # Summary
+    # ────────────────────────────────────────────────────────────────
+
+    print()
     print("=" * 78)
-    header = f"{'Strategy':<12}{'Correctness':>14}{'Relevance':>12}{'Completeness':>14}{'Faithfulness':>14}"
+    print(" Answer Quality Summary (1–5 scale)")
+    print("=" * 78)
+
+    header = (
+        f"{'Strategy':<14}"
+        f"{'Correctness':>14}"
+        f"{'Relevance':>12}"
+        f"{'Completeness':>15}"
+        f"{'Faithfulness':>15}"
+    )
+
     print(header)
     print("-" * 78)
+
     for strategy in STRATEGIES:
-        rows = [r for r in all_results if r["strategy"] == strategy and r.get("correctness") is not None]
+
+        rows = [
+            r
+            for r in all_results
+            if r["strategy"] == strategy
+            and r.get("correctness") is not None
+        ]
+
         if not rows:
             continue
-        n = len(rows)
-        avg = lambda k: sum(r[k] for r in rows) / n
-        print(
-            f"{strategy:<12}{avg('correctness'):>14.2f}{avg('relevance'):>12.2f}"
-            f"{avg('completeness'):>14.2f}{avg('faithfulness'):>14.2f}"
-        )
-    print("=" * 78)
-    print("Saved: answer_quality_results.json, answer_quality_for_human_review.csv\n")
 
+        n = len(rows)
+
+        def average(metric):
+
+            return sum(
+                r[metric]
+                for r in rows
+            ) / n
+
+        print(
+            f"{strategy:<14}"
+            f"{average('correctness'):>14.2f}"
+            f"{average('relevance'):>12.2f}"
+            f"{average('completeness'):>15.2f}"
+            f"{average('faithfulness'):>15.2f}"
+        )
+
+    print("=" * 78)
+
+    print()
+    print("Saved:")
+    print("  answer_quality_results.json")
+    print("  answer_quality_for_human_review.csv")
+    print()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Run
+# ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     main()

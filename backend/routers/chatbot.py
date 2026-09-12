@@ -36,8 +36,9 @@ PINECONE_REGION = os.environ.get("PINECONE_REGION", "us-east-1")
 
 EMBED_MODEL = "models/gemini-embedding-001"
 EMBED_DIM = 768
-CHAT_MODEL = "gemini-2.5-flash"
-INDEX_NAME = "numerix-chatbot"
+CHAT_MODEL = "gemini-3.5-flash-lite"
+model = genai.GenerativeModel(CHAT_MODEL)
+INDEX_NAME = "acw-index"
 
 _pc = Pinecone(api_key=PINECONE_API_KEY) if PINECONE_API_KEY else None
 _index = None
