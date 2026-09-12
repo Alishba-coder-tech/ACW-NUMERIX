@@ -1,98 +1,62 @@
-# NumeriX — Interactive Numerical Methods Calculator
 
-> Bahria University Karachi · BSE-6C · Numerical Analysis Project
+# Adaptive Context Wrapper (ACW)
 
-A full-stack interactive web platform implementing 13 labs of numerical methods with real-time computation, iteration tables, and live charts.
+## Overview
 
----
+This project implements an **Adaptive Context Wrapper (ACW)** for reducing unnecessary context passed to Large Language Models (LLMs) in Retrieval-Augmented Generation (RAG) systems.
 
-## 🔥 Name
-**NumeriX** — *Numer* (Numerical) + *X* (unknown, solving for x)
+ACW dynamically controls the amount of retrieved and conversational context provided to the model, aiming to reduce **token usage and latency while maintaining answer quality**.
 
----
+## Strategies
 
-## 📦 Project Structure
+The system evaluates three strategies:
 
+* **Baseline:** Full available context is used.
+* **Moderate:** Context is reduced while preserving relevant information.
+* **Aggressive:** Stronger context reduction is applied to maximize token savings.
+
+## Evaluation Metrics
+
+The experiments measure:
+
+* Tokens before and after context reduction
+* Token reduction percentage
+* Response latency
+* Retrieved and selected chunks
+* Response length
+* Answer quality
+
+## Experimental Setup
+
+Each strategy is evaluated using the **same query set and retrieval configuration** to ensure a fair comparison.
+
+Results are stored in:
+
+```text
+acw_experiment_results.json
 ```
-numerix/
-├── frontend/     ← React + Tailwind CSS (deploy to Vercel)
-└── backend/      ← Python FastAPI (deploy to Vercel / Railway)
-```
 
----
+Run the experiment with:
 
-## 🧩 Modules Covered
-
-| Module | Methods | Labs |
-|--------|---------|------|
-| Error Analyzer | Absolute, Relative, Round-off, Truncation | Lab 2 |
-| Root Finder | Bisection, False Position, Newton-Raphson, Fixed-Point | Labs 4–5 |
-| Interpolator | Newton Forward/Backward, Divided Difference, Lagrange | Labs 6–7 |
-| Differentiator | Forward & Backward Finite Differences (1st & 2nd order) | Lab 8 |
-| Integrator | Trapezoidal, Simpson's 1/3, Simpson's 3/8, Unequal Segments | Labs 9–10 |
-| ODE Solver | Euler, Improved Euler, Runge-Kutta 4th Order | Labs 11–12 |
-| Linear Systems | LU Decomposition (Doolittle & Crout) | Lab 13 |
-
----
-
-## 🚀 Local Setup
-
-### Backend (FastAPI)
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+python run_experiment.py
 ```
 
-### Frontend (React)
-```bash
-cd frontend
-cp .env.example .env          # set REACT_APP_API_URL=http://localhost:8000
-npm install
-npm start
-```
+## Technology
 
-Open http://localhost:3000
+* Python
+* FastAPI
+* Google Gemini
+* Pinecone
+* React
+* Retrieval-Augmented Generation (RAG)
 
----
+## Research Objective
 
-## ☁️ Deployment on Vercel
+The primary objective is to determine whether **adaptive context selection can reduce LLM context/token consumption without significantly affecting response quality**.
 
-### Step 1 — Deploy Backend
-1. Go to [vercel.com](https://vercel.com) → New Project → import `backend/` folder
-2. Framework: **Other**
-3. Root Directory: `backend`
-4. Deploy → copy the URL (e.g. `https://numerix-api.vercel.app`)
+## Project
 
-### Step 2 — Deploy Frontend
-1. New Project → import `frontend/` folder
-2. Framework: **Create React App**
-3. Root Directory: `frontend`
-4. Add Environment Variable:
-   - `REACT_APP_API_URL` = `https://numerix-api.vercel.app` (your backend URL)
-5. Deploy ✅
+ACW is implemented as part of the **NumeriX AI-powered numerical analysis chatbot** and is intended for academic research and experimental evaluation.
 
-> **Alternative Backend**: Deploy backend to [Railway](https://railway.app) for persistent FastAPI hosting (recommended over Vercel for Python).
-
----
-
-## 🛠 Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18, Tailwind CSS, Recharts, React Router |
-| Backend | Python, FastAPI, Uvicorn, Pydantic |
-| Deployment | Vercel (frontend + backend) |
-| Fonts | Space Grotesk, JetBrains Mono, Inter |
-
----
-
-## 📐 Design System
-
-- **Color**: Dark obsidian background `#080B14` with neon cyan `#00F5FF` accents
-- **Type**: Space Grotesk (display) + JetBrains Mono (data/code) + Inter (body)
-- **Signature**: Glowing neon-on-dark aesthetic with glass-morphism cards
-
----
-
-*Made for BSE-6C Numerical Analysis Final Project — Bahria University Karachi Campus*
+This version is much better for a GitHub repository: **short, technical, and directly focused on the research contribution.**
