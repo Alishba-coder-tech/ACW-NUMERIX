@@ -1,36 +1,28 @@
+import sys, os 
+sys.path.insert(0, r'C:\Users\wajiz.pk\Downloads\numerix_project_with_chatbot\numerix\backend') 
 """
-NumeriX AI Assistant
----------------------
-A lightweight RAG (retrieval-augmented generation) chatbot that answers
-questions about the numerical methods implemented in this app.
-
-- Embeddings: models/gemini-embedding-001  (semantic search over the KB)
-- Generation: gemini-2.5-flash             (answer synthesis)
-
-Requires GOOGLE_API_KEY in the environment (see backend/.env.example).
-"""
-
-"""
-NumeriX AI Assistant
----------------------
-A RAG (retrieval-augmented generation) chatbot that answers questions
-about the numerical methods implemented in this app.
-
-- Embeddings: models/gemini-embedding-001  (768-dim, via output_dimensionality)
-- Vector DB:  Pinecone serverless index    (free tier)
-- Generation: gemini-2.5-flash             (answer synthesis)
-
-Requires GOOGLE_API_KEY and PINECONE_API_KEY in the environment
-(see backend/.env.example).
+NumeriX AI Assistant — with Adaptive Context Wrapper (ACW)
+-----------------------------------------------------------
+Changes from original chatbot.py:
+  1. Imported acw.py (fixed path)
+  2. /ask endpoint now accepts a `strategy` field ("baseline" | "moderate" | "aggressive")
+  3. ACW filters chunks before building context
+  4. Response includes `acw_metrics` for research data visibility
+  5. Everything else unchanged
 """
 
 import os
+import sys
 from typing import List, Optional
+
+# ── FIX: add backend/ folder to path so acw.py can be found ─────────────────
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import google.generativeai as genai
 from fastapi import APIRouter, HTTPException
 from pinecone import Pinecone, ServerlessSpec
 from pydantic import BaseModel
+from routers.acw import adaptive_context_wrapper
 
 router = APIRouter()
 
@@ -43,7 +35,7 @@ PINECONE_CLOUD = os.environ.get("PINECONE_CLOUD", "aws")
 PINECONE_REGION = os.environ.get("PINECONE_REGION", "us-east-1")
 
 EMBED_MODEL = "models/gemini-embedding-001"
-EMBED_DIM = 768  # gemini-embedding-001 supports truncated dims via MRL
+EMBED_DIM = 768
 CHAT_MODEL = "gemini-2.5-flash"
 INDEX_NAME = "numerix-chatbot"
 
@@ -52,7 +44,6 @@ _index = None
 
 
 def _get_index():
-    """Lazily create/connect to the Pinecone serverless index (free tier)."""
     global _index
     if _index is not None:
         return _index
@@ -72,9 +63,7 @@ def _get_index():
     _index = _pc.Index(INDEX_NAME)
     return _index
 
-# ---------------------------------------------------------------------------
-# Knowledge base — one chunk per module/method, used for retrieval grounding.
-# ---------------------------------------------------------------------------
+
 KNOWLEDGE_BASE = [
     {
         "id": "errors",
@@ -179,12 +168,10 @@ KNOWLEDGE_BASE = [
     },
 ]
 
-# Tracks whether we've upserted the KB into Pinecone this process lifetime.
 _kb_seeded = False
 
 
 def _ensure_kb_seeded():
-    """Embed the knowledge base and upsert it into Pinecone, once."""
     global _kb_seeded
     if _kb_seeded:
         return
@@ -193,7 +180,6 @@ def _ensure_kb_seeded():
     if stats.get("total_vector_count", 0) >= len(KNOWLEDGE_BASE):
         _kb_seeded = True
         return
-
     vectors = []
     for chunk in KNOWLEDGE_BASE:
         result = genai.embed_content(
@@ -223,7 +209,6 @@ def _retrieve(query: str, top_k: int = 3) -> List[dict]:
         task_type="retrieval_query",
         output_dimensionality=EMBED_DIM,
     )["embedding"]
-
     results = index.query(vector=q_embed, top_k=top_k, include_metadata=True)
     return [
         {
@@ -237,31 +222,43 @@ def _retrieve(query: str, top_k: int = 3) -> List[dict]:
 
 
 class ChatMessage(BaseModel):
-    role: str  # "user" | "assistant"
+    role: str
     content: str
 
 
 class ChatInput(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = []
+    strategy: Optional[str] = "moderate"
+    # ── Ablation-study controls (optional; defaults reproduce original behavior) ──
+    alpha: Optional[float] = None            # override ACW alpha, e.g. 0.3 / 0.5 / 0.9
+    scoring_mode: Optional[str] = "hybrid"   # "hybrid" | "cosine_only" | "density_only"
 
 
 @router.post("/ask")
 def ask(data: ChatInput):
     if not GOOGLE_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="GOOGLE_API_KEY is not configured on the server.",
-        )
+        raise HTTPException(status_code=500, detail="GOOGLE_API_KEY is not configured.")
     if not PINECONE_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="PINECONE_API_KEY is not configured on the server.",
-        )
+        raise HTTPException(status_code=500, detail="PINECONE_API_KEY is not configured.")
+
     try:
-        top_chunks = _retrieve(data.message, top_k=3)
+        # Step 1: Retrieve from Pinecone
+        raw_chunks = _retrieve(data.message, top_k=3)
+
+        # Step 2: ACW filters chunks
+        strategy = data.strategy or "moderate"
+        selected_chunks, acw_metrics = adaptive_context_wrapper(
+            query=data.message,
+            chunks=raw_chunks,
+            strategy=strategy,
+            alpha=data.alpha,
+            scoring_mode=data.scoring_mode or "hybrid",
+        )
+
+        # Step 3: Build context from selected chunks only
         context = "\n\n".join(
-            f"[{c['title']}]\n{c['content']}" for c in top_chunks
+            f"[{c['title']}]\n{c['content']}" for c in selected_chunks
         )
 
         system_prompt = (
@@ -275,7 +272,6 @@ def ask(data: ChatInput):
             f"Reference context:\n{context}"
         )
 
-        # Build chat history for the model (Gemini expects alternating turns)
         history_payload = []
         for m in data.history or []:
             role = "model" if m.role == "assistant" else "user"
@@ -290,8 +286,19 @@ def ask(data: ChatInput):
 
         return {
             "reply": response.text,
-            "sources": [c["title"] for c in top_chunks],
+            "sources": [c["title"] for c in selected_chunks],
+            "acw_metrics": {
+                "strategy": strategy,
+                "chunks_retrieved": acw_metrics["chunks_retrieved"],
+                "chunks_selected": acw_metrics["chunks_selected"],
+                "tokens_before": acw_metrics["tokens_before"],
+                "tokens_after": acw_metrics["tokens_after"],
+                "token_reduction_pct": acw_metrics["token_reduction_pct"],
+                "scoring_mode": acw_metrics.get("scoring_mode"),
+                "alpha_used": acw_metrics.get("alpha_used"),
+            },
         }
+
     except HTTPException:
         raise
     except Exception as e:
