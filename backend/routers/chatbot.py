@@ -1,28 +1,46 @@
-import sys, os 
-sys.path.insert(0, r'C:\Users\wajiz.pk\Downloads\numerix_project_with_chatbot\numerix\backend') 
 """
 NumeriX AI Assistant — with Adaptive Context Wrapper (ACW)
 -----------------------------------------------------------
-Changes from original chatbot.py:
-  1. Imported acw.py (fixed path)
-  2. /ask endpoint now accepts a `strategy` field ("baseline" | "moderate" | "aggressive")
-  3. ACW filters chunks before building context
-  4. Response includes `acw_metrics` for research data visibility
-  5. Everything else unchanged
+Changes from previous version:
+  1. Wired in the 3 new modules under backend/modules/:
+       - risk_aware_compression.py  -> picks a compression strategy per-query risk
+       - semantic_safety_guard.py   -> pre-checks that filtering didn't drop
+                                        numbers/dates/constraints before we ever
+                                        call Gemini
+       - context_recovery.py        -> scores the generated answer's quality and,
+                                        if it's weak, retries with less compression
+                                        (Compress -> Generate -> Evaluate -> Recover)
+  2. All of this is OPT-IN via `use_risk_aware: true` in the request body.
+     Default behavior (use_risk_aware=False, the default) is UNCHANGED, so
+     run_experiment.py / run_ablation.py / evaluate_answer_quality.py keep
+     working exactly as before with the explicit strategy/alpha they pass.
+  3. Response now includes `risk_assessment`, `safety_report`, and
+     `recovery` fields when risk-aware mode is used (null otherwise).
+
+COST/QUOTA NOTE: with use_risk_aware=True, a low-confidence answer can
+trigger up to `max_recovery_attempts` EXTRA Gemini generate_content calls
+per request (it regenerates the answer with more context, not just re-scores
+the old one). If you're still tight on free-tier quota, leave use_risk_aware
+off for your bulk experiment runs and only turn it on for a small demo.
 """
 
 import os
 import sys
 from typing import List, Optional
 
-# ── FIX: add backend/ folder to path so acw.py can be found ─────────────────
+# Make sure backend/ is on sys.path so `routers.acw` and `modules.*` resolve
+# the same way regardless of where this file is launched from.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import google.generativeai as genai
 from fastapi import APIRouter, HTTPException
 from pinecone import Pinecone, ServerlessSpec
 from pydantic import BaseModel
+
 from routers.acw import adaptive_context_wrapper
+from modules.risk_aware_compression import RiskAwareCompression, CompressionLevel
+from modules.semantic_safety_guard import SemanticSafetyGuard
+from modules.context_recovery import ContextRecovery
 
 router = APIRouter()
 
@@ -36,12 +54,41 @@ PINECONE_REGION = os.environ.get("PINECONE_REGION", "us-east-1")
 
 EMBED_MODEL = "models/gemini-embedding-001"
 EMBED_DIM = 768
+# NOTE: double-check this model name is actually enabled on your account —
+# "gemini-3.5-flash-lite" isn't a published Gemini model as of this writing.
+# If /ask starts returning 400s unrelated to quota, this is the first thing
+# to check — try "gemini-2.5-flash-lite" or "gemini-2.5-flash" instead.
 CHAT_MODEL = "gemini-3.5-flash-lite"
-model = genai.GenerativeModel(CHAT_MODEL)
 INDEX_NAME = "acw-index"
 
 _pc = Pinecone(api_key=PINECONE_API_KEY) if PINECONE_API_KEY else None
 _index = None
+
+# Risk-aware ACW pipeline components (stateless, safe to reuse)
+_risk_scorer = RiskAwareCompression()
+_safety_guard = SemanticSafetyGuard()
+_recovery = ContextRecovery()
+
+# Maps the 5-level compression ladder from risk_aware_compression.py onto the
+# 3 strategies acw.py actually implements. NONE/MILD lean toward keeping more
+# context; AGGRESSIVE/EXTREME lean toward keeping less.
+COMPRESSION_TO_STRATEGY = {
+    CompressionLevel.NONE: "baseline",
+    CompressionLevel.MILD: "moderate",
+    CompressionLevel.MODERATE: "moderate",
+    CompressionLevel.AGGRESSIVE: "aggressive",
+    CompressionLevel.EXTREME: "aggressive",
+}
+
+# Escalation order used by the recovery ladder: from most compressed to least.
+_STRATEGY_RANK = {"aggressive": 0, "moderate": 1, "baseline": 2}
+_ESCALATION_ORDER = ["aggressive", "moderate", "baseline"]
+
+
+def _next_strategies_above(strategy: str) -> List[str]:
+    """Strategies with strictly more context than `strategy`, ordered nearest-first."""
+    rank = _STRATEGY_RANK.get(strategy, 1)
+    return [s for s in _ESCALATION_ORDER if _STRATEGY_RANK[s] > rank]
 
 
 def _get_index():
@@ -222,6 +269,30 @@ def _retrieve(query: str, top_k: int = 3) -> List[dict]:
     ]
 
 
+def _build_context(selected_chunks: List[dict]) -> str:
+    return "\n\n".join(f"[{c['title']}]\n{c['content']}" for c in selected_chunks)
+
+
+def _generate(query: str, context: str, history_payload: list) -> str:
+    system_prompt = (
+        "You are the NumeriX Assistant, a helpful tutor embedded in a "
+        "numerical methods web app for a Numerical Analysis course. "
+        "Answer the user's question using the reference context below "
+        "when relevant. Explain concepts clearly and concisely, use "
+        "the method names and endpoints from the context when helpful, "
+        "and if a question is unrelated to numerical methods or this "
+        "app, politely say so and redirect to what you can help with.\n\n"
+        f"Reference context:\n{context}"
+    )
+    model = genai.GenerativeModel(
+        model_name=CHAT_MODEL,
+        system_instruction=system_prompt,
+    )
+    chat = model.start_chat(history=history_payload)
+    response = chat.send_message(query)
+    return response.text
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -231,9 +302,12 @@ class ChatInput(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = []
     strategy: Optional[str] = "moderate"
-    # ── Ablation-study controls (optional; defaults reproduce original behavior) ──
-    alpha: Optional[float] = None            # override ACW alpha, e.g. 0.3 / 0.5 / 0.9
-    scoring_mode: Optional[str] = "hybrid"   # "hybrid" | "cosine_only" | "density_only"
+    # Ablation-study controls (unchanged; used by run_ablation.py)
+    alpha: Optional[float] = None
+    scoring_mode: Optional[str] = "hybrid"
+    # New: risk-aware pipeline controls (opt-in, default OFF)
+    use_risk_aware: Optional[bool] = False
+    max_recovery_attempts: Optional[int] = 1  # caps extra Gemini calls
 
 
 @router.post("/ask")
@@ -244,11 +318,32 @@ def ask(data: ChatInput):
         raise HTTPException(status_code=500, detail="PINECONE_API_KEY is not configured.")
 
     try:
+        history_payload = []
+        for m in data.history or []:
+            role = "model" if m.role == "assistant" else "user"
+            history_payload.append({"role": role, "parts": [m.content]})
+
         # Step 1: Retrieve from Pinecone
         raw_chunks = _retrieve(data.message, top_k=3)
 
-        # Step 2: ACW filters chunks
-        strategy = data.strategy or "moderate"
+        risk_assessment = None
+        safety_report = None
+        recovery_info = None
+
+        # Step 2: Pick a strategy — either exactly what the caller asked for
+        # (default, backward-compatible with run_experiment.py / run_ablation.py)
+        # or risk-driven, if use_risk_aware=True.
+        if data.use_risk_aware:
+            compression_level, risk_meta = _risk_scorer.select_compression_level(
+                query=data.message,
+                domain="numerical methods",
+            )
+            strategy = COMPRESSION_TO_STRATEGY.get(compression_level, "moderate")
+            risk_assessment = risk_meta
+        else:
+            strategy = data.strategy or "moderate"
+
+        # Step 3: ACW filters chunks
         selected_chunks, acw_metrics = adaptive_context_wrapper(
             query=data.message,
             chunks=raw_chunks,
@@ -257,36 +352,71 @@ def ask(data: ChatInput):
             scoring_mode=data.scoring_mode or "hybrid",
         )
 
-        # Step 3: Build context from selected chunks only
-        context = "\n\n".join(
-            f"[{c['title']}]\n{c['content']}" for c in selected_chunks
-        )
+        if data.use_risk_aware:
+            # Step 4: Semantic safety pre-check, BEFORE spending a Gemini call.
+            # If compression dropped too many critical tokens (numbers, dates,
+            # constraints), escalate to the next-fuller strategy immediately.
+            is_safe, safety_meta = _safety_guard.validate_compression_safety(
+                raw_chunks, selected_chunks, threshold=0.6
+            )
+            safety_report = safety_meta
+            if not is_safe:
+                fuller_strategies = _next_strategies_above(strategy)
+                if fuller_strategies:
+                    strategy = fuller_strategies[0]
+                    selected_chunks, acw_metrics = adaptive_context_wrapper(
+                        query=data.message,
+                        chunks=raw_chunks,
+                        strategy=strategy,
+                        alpha=data.alpha,
+                        scoring_mode=data.scoring_mode or "hybrid",
+                    )
 
-        system_prompt = (
-            "You are the NumeriX Assistant, a helpful tutor embedded in a "
-            "numerical methods web app for a Numerical Analysis course. "
-            "Answer the user's question using the reference context below "
-            "when relevant. Explain concepts clearly and concisely, use "
-            "the method names and endpoints from the context when helpful, "
-            "and if a question is unrelated to numerical methods or this "
-            "app, politely say so and redirect to what you can help with.\n\n"
-            f"Reference context:\n{context}"
-        )
+        # Step 5: Build context from selected chunks and generate the answer
+        context = _build_context(selected_chunks)
+        reply_text = _generate(data.message, context, history_payload)
 
-        history_payload = []
-        for m in data.history or []:
-            role = "model" if m.role == "assistant" else "user"
-            history_payload.append({"role": role, "parts": [m.content]})
+        # Step 6: Evaluate confidence and recover (retry with less compression)
+        # if the answer looks weak. Bounded by max_recovery_attempts so a bad
+        # query can't silently burn through your Gemini quota.
+        if data.use_risk_aware:
+            confidence, score, eval_meta = _recovery.evaluate_response_quality(
+                data.message, reply_text, context
+            )
+            attempts = []
+            ladder = _next_strategies_above(strategy)
+            budget = max(0, data.max_recovery_attempts or 0)
 
-        model = genai.GenerativeModel(
-            model_name=CHAT_MODEL,
-            system_instruction=system_prompt,
-        )
-        chat = model.start_chat(history=history_payload)
-        response = chat.send_message(data.message)
+            while _recovery.should_recover(confidence, score) and ladder and budget > 0:
+                strategy = ladder.pop(0)
+                selected_chunks, acw_metrics = adaptive_context_wrapper(
+                    query=data.message,
+                    chunks=raw_chunks,
+                    strategy=strategy,
+                    alpha=data.alpha,
+                    scoring_mode=data.scoring_mode or "hybrid",
+                )
+                context = _build_context(selected_chunks)
+                reply_text = _generate(data.message, context, history_payload)
+                confidence, score, eval_meta = _recovery.evaluate_response_quality(
+                    data.message, reply_text, context
+                )
+                attempts.append({
+                    "compression_level": strategy,
+                    "confidence": confidence.name,
+                    "score": round(score, 3),
+                })
+                budget -= 1
+
+            recovery_info = {
+                "final_confidence": confidence.name,
+                "final_score": round(score, 3),
+                "recovery_attempts": attempts,
+                "recovered": len(attempts) > 0,
+            }
 
         return {
-            "reply": response.text,
+            "reply": reply_text,
             "sources": [c["title"] for c in selected_chunks],
             "acw_metrics": {
                 "strategy": strategy,
@@ -298,6 +428,9 @@ def ask(data: ChatInput):
                 "scoring_mode": acw_metrics.get("scoring_mode"),
                 "alpha_used": acw_metrics.get("alpha_used"),
             },
+            "risk_assessment": risk_assessment,
+            "safety_report": safety_report,
+            "recovery": recovery_info,
         }
 
     except HTTPException:

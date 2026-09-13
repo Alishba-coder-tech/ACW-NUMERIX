@@ -3,13 +3,13 @@
     {
       "query": "What is the Bisection method?",
       "strategy": "baseline",
-      "latency_ms": 9175.7,
+      "latency_ms": 8926.5,
       "tokens_before": 288,
       "tokens_after": 288,
       "token_reduction_pct": 0.0,
       "chunks_retrieved": 3,
       "chunks_selected": 3,
-      "reply_length": 1074,
+      "reply_length": 962,
       "sources": [
         "Root Finder (Labs 4-5)",
         "Error Analyzer (Lab 2)",
@@ -20,7 +20,7 @@
     {
       "query": "How does Newton-Raphson converge?",
       "strategy": "baseline",
-      "latency_ms": 3019.5,
+      "latency_ms": 3014.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -33,7 +33,7 @@
     {
       "query": "What is False Position method?",
       "strategy": "baseline",
-      "latency_ms": 3079.0,
+      "latency_ms": 2994.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -46,7 +46,7 @@
     {
       "query": "When does Fixed-Point iteration fail?",
       "strategy": "baseline",
-      "latency_ms": 3083.3,
+      "latency_ms": 2965.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -59,7 +59,7 @@
     {
       "query": "What is quadratic convergence?",
       "strategy": "baseline",
-      "latency_ms": 2979.3,
+      "latency_ms": 2951.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -72,7 +72,7 @@
     {
       "query": "How do I choose the initial bracket for Bisection?",
       "strategy": "baseline",
-      "latency_ms": 3182.7,
+      "latency_ms": 2941.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -85,7 +85,7 @@
     {
       "query": "What is Simpson's 1/3 rule?",
       "strategy": "baseline",
-      "latency_ms": 3000.1,
+      "latency_ms": 3025.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -98,7 +98,7 @@
     {
       "query": "When should I use Trapezoidal rule?",
       "strategy": "baseline",
-      "latency_ms": 3049.3,
+      "latency_ms": 2946.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -111,7 +111,7 @@
     {
       "query": "What is the difference between Simpson 1/3 and 3/8?",
       "strategy": "baseline",
-      "latency_ms": 2953.6,
+      "latency_ms": 3015.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -124,7 +124,7 @@
     {
       "query": "How many intervals does Simpson's 1/3 require?",
       "strategy": "baseline",
-      "latency_ms": 2998.1,
+      "latency_ms": 2978.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -137,7 +137,7 @@
     {
       "query": "What is numerical integration used for?",
       "strategy": "baseline",
-      "latency_ms": 3080.7,
+      "latency_ms": 2943.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -150,7 +150,7 @@
     {
       "query": "Why is RK4 more accurate than Euler's method?",
       "strategy": "baseline",
-      "latency_ms": 3010.2,
+      "latency_ms": 2973.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -163,7 +163,7 @@
     {
       "query": "What is Heun's method?",
       "strategy": "baseline",
-      "latency_ms": 2880.3,
+      "latency_ms": 3001.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -176,7 +176,7 @@
     {
       "query": "How does Euler's method work?",
       "strategy": "baseline",
-      "latency_ms": 3035.7,
+      "latency_ms": 2948.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -189,7 +189,7 @@
     {
       "query": "What is a first order ODE?",
       "strategy": "baseline",
-      "latency_ms": 3052.1,
+      "latency_ms": 2974.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -202,7 +202,7 @@
     {
       "query": "What is Lagrange interpolation?",
       "strategy": "baseline",
-      "latency_ms": 2886.1,
+      "latency_ms": 2987.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -215,7 +215,7 @@
     {
       "query": "When do I use Newton's forward difference?",
       "strategy": "baseline",
-      "latency_ms": 2979.3,
+      "latency_ms": 2957.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -228,7 +228,7 @@
     {
       "query": "What is divided difference?",
       "strategy": "baseline",
-      "latency_ms": 2978.5,
+      "latency_ms": 2972.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -241,7 +241,7 @@
     {
       "query": "What is the difference between forward and backward difference?",
       "strategy": "baseline",
-      "latency_ms": 2977.0,
+      "latency_ms": 2896.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -254,7 +254,7 @@
     {
       "query": "What is finite difference?",
       "strategy": "baseline",
-      "latency_ms": 2978.3,
+      "latency_ms": 2948.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -267,7 +267,7 @@
     {
       "query": "How do you compute a numerical derivative?",
       "strategy": "baseline",
-      "latency_ms": 3010.8,
+      "latency_ms": 2905.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -280,7 +280,7 @@
     {
       "query": "What is forward difference formula?",
       "strategy": "baseline",
-      "latency_ms": 3138.6,
+      "latency_ms": 2877.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -293,7 +293,7 @@
     {
       "query": "What is LU decomposition?",
       "strategy": "baseline",
-      "latency_ms": 3082.6,
+      "latency_ms": 2919.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -306,7 +306,7 @@
     {
       "query": "What is the Doolittle method?",
       "strategy": "baseline",
-      "latency_ms": 2887.2,
+      "latency_ms": 2951.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -319,7 +319,7 @@
     {
       "query": "How does back substitution work?",
       "strategy": "baseline",
-      "latency_ms": 2938.9,
+      "latency_ms": 2931.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -332,7 +332,7 @@
     {
       "query": "What is truncation error?",
       "strategy": "baseline",
-      "latency_ms": 3054.3,
+      "latency_ms": 2899.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -345,7 +345,7 @@
     {
       "query": "What is round-off error?",
       "strategy": "baseline",
-      "latency_ms": 3236.9,
+      "latency_ms": 3000.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -358,7 +358,7 @@
     {
       "query": "What is absolute vs relative error?",
       "strategy": "baseline",
-      "latency_ms": 3081.6,
+      "latency_ms": 2913.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -371,7 +371,7 @@
     {
       "query": "What is NumeriX?",
       "strategy": "baseline",
-      "latency_ms": 3077.6,
+      "latency_ms": 2906.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -384,7 +384,7 @@
     {
       "query": "What topics does this app cover?",
       "strategy": "baseline",
-      "latency_ms": 3080.4,
+      "latency_ms": 2886.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -399,7 +399,7 @@
     {
       "query": "What is the Bisection method?",
       "strategy": "moderate",
-      "latency_ms": 3183.0,
+      "latency_ms": 2902.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -412,7 +412,7 @@
     {
       "query": "How does Newton-Raphson converge?",
       "strategy": "moderate",
-      "latency_ms": 3082.2,
+      "latency_ms": 2963.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -425,7 +425,7 @@
     {
       "query": "What is False Position method?",
       "strategy": "moderate",
-      "latency_ms": 2878.5,
+      "latency_ms": 3019.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -438,7 +438,7 @@
     {
       "query": "When does Fixed-Point iteration fail?",
       "strategy": "moderate",
-      "latency_ms": 3079.1,
+      "latency_ms": 2908.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -451,7 +451,7 @@
     {
       "query": "What is quadratic convergence?",
       "strategy": "moderate",
-      "latency_ms": 3078.9,
+      "latency_ms": 2900.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -464,7 +464,7 @@
     {
       "query": "How do I choose the initial bracket for Bisection?",
       "strategy": "moderate",
-      "latency_ms": 2880.0,
+      "latency_ms": 2896.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -477,7 +477,7 @@
     {
       "query": "What is Simpson's 1/3 rule?",
       "strategy": "moderate",
-      "latency_ms": 3082.1,
+      "latency_ms": 2910.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -490,7 +490,7 @@
     {
       "query": "When should I use Trapezoidal rule?",
       "strategy": "moderate",
-      "latency_ms": 3002.2,
+      "latency_ms": 2909.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -503,7 +503,7 @@
     {
       "query": "What is the difference between Simpson 1/3 and 3/8?",
       "strategy": "moderate",
-      "latency_ms": 2999.4,
+      "latency_ms": 2962.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -516,7 +516,7 @@
     {
       "query": "How many intervals does Simpson's 1/3 require?",
       "strategy": "moderate",
-      "latency_ms": 3012.1,
+      "latency_ms": 2892.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -529,7 +529,7 @@
     {
       "query": "What is numerical integration used for?",
       "strategy": "moderate",
-      "latency_ms": 3011.8,
+      "latency_ms": 2900.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -542,7 +542,7 @@
     {
       "query": "Why is RK4 more accurate than Euler's method?",
       "strategy": "moderate",
-      "latency_ms": 3064.6,
+      "latency_ms": 2906.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -555,7 +555,7 @@
     {
       "query": "What is Heun's method?",
       "strategy": "moderate",
-      "latency_ms": 3077.9,
+      "latency_ms": 2958.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -568,7 +568,7 @@
     {
       "query": "How does Euler's method work?",
       "strategy": "moderate",
-      "latency_ms": 3021.5,
+      "latency_ms": 2920.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -581,7 +581,7 @@
     {
       "query": "What is a first order ODE?",
       "strategy": "moderate",
-      "latency_ms": 3037.3,
+      "latency_ms": 2977.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -594,7 +594,7 @@
     {
       "query": "What is Lagrange interpolation?",
       "strategy": "moderate",
-      "latency_ms": 2978.8,
+      "latency_ms": 2967.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -607,7 +607,7 @@
     {
       "query": "When do I use Newton's forward difference?",
       "strategy": "moderate",
-      "latency_ms": 2971.4,
+      "latency_ms": 2887.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -620,7 +620,7 @@
     {
       "query": "What is divided difference?",
       "strategy": "moderate",
-      "latency_ms": 3386.0,
+      "latency_ms": 2954.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -633,7 +633,7 @@
     {
       "query": "What is the difference between forward and backward difference?",
       "strategy": "moderate",
-      "latency_ms": 3082.6,
+      "latency_ms": 2964.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -646,7 +646,7 @@
     {
       "query": "What is finite difference?",
       "strategy": "moderate",
-      "latency_ms": 2947.9,
+      "latency_ms": 2910.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -659,7 +659,7 @@
     {
       "query": "How do you compute a numerical derivative?",
       "strategy": "moderate",
-      "latency_ms": 3077.5,
+      "latency_ms": 2917.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -672,7 +672,7 @@
     {
       "query": "What is forward difference formula?",
       "strategy": "moderate",
-      "latency_ms": 3011.9,
+      "latency_ms": 2895.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -685,7 +685,7 @@
     {
       "query": "What is LU decomposition?",
       "strategy": "moderate",
-      "latency_ms": 3084.3,
+      "latency_ms": 2922.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -698,7 +698,7 @@
     {
       "query": "What is the Doolittle method?",
       "strategy": "moderate",
-      "latency_ms": 3079.8,
+      "latency_ms": 2960.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -711,7 +711,7 @@
     {
       "query": "How does back substitution work?",
       "strategy": "moderate",
-      "latency_ms": 2977.7,
+      "latency_ms": 2924.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -724,7 +724,7 @@
     {
       "query": "What is truncation error?",
       "strategy": "moderate",
-      "latency_ms": 3048.4,
+      "latency_ms": 2880.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -737,7 +737,7 @@
     {
       "query": "What is round-off error?",
       "strategy": "moderate",
-      "latency_ms": 3010.7,
+      "latency_ms": 2931.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -750,7 +750,7 @@
     {
       "query": "What is absolute vs relative error?",
       "strategy": "moderate",
-      "latency_ms": 2833.7,
+      "latency_ms": 2885.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -763,7 +763,7 @@
     {
       "query": "What is NumeriX?",
       "strategy": "moderate",
-      "latency_ms": 3090.4,
+      "latency_ms": 3026.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -776,7 +776,7 @@
     {
       "query": "What topics does this app cover?",
       "strategy": "moderate",
-      "latency_ms": 3112.8,
+      "latency_ms": 3003.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -791,7 +791,7 @@
     {
       "query": "What is the Bisection method?",
       "strategy": "aggressive",
-      "latency_ms": 2980.8,
+      "latency_ms": 2963.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -804,7 +804,7 @@
     {
       "query": "How does Newton-Raphson converge?",
       "strategy": "aggressive",
-      "latency_ms": 2978.0,
+      "latency_ms": 2937.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -817,7 +817,7 @@
     {
       "query": "What is False Position method?",
       "strategy": "aggressive",
-      "latency_ms": 2940.9,
+      "latency_ms": 2898.3,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -830,7 +830,7 @@
     {
       "query": "When does Fixed-Point iteration fail?",
       "strategy": "aggressive",
-      "latency_ms": 2844.0,
+      "latency_ms": 2931.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -843,7 +843,7 @@
     {
       "query": "What is quadratic convergence?",
       "strategy": "aggressive",
-      "latency_ms": 2889.4,
+      "latency_ms": 2905.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -856,7 +856,7 @@
     {
       "query": "How do I choose the initial bracket for Bisection?",
       "strategy": "aggressive",
-      "latency_ms": 3078.6,
+      "latency_ms": 2917.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -869,7 +869,7 @@
     {
       "query": "What is Simpson's 1/3 rule?",
       "strategy": "aggressive",
-      "latency_ms": 3384.3,
+      "latency_ms": 2863.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -882,7 +882,7 @@
     {
       "query": "When should I use Trapezoidal rule?",
       "strategy": "aggressive",
-      "latency_ms": 3034.9,
+      "latency_ms": 2893.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -895,7 +895,7 @@
     {
       "query": "What is the difference between Simpson 1/3 and 3/8?",
       "strategy": "aggressive",
-      "latency_ms": 2970.2,
+      "latency_ms": 2886.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -908,7 +908,7 @@
     {
       "query": "How many intervals does Simpson's 1/3 require?",
       "strategy": "aggressive",
-      "latency_ms": 3087.4,
+      "latency_ms": 2896.8,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -921,7 +921,7 @@
     {
       "query": "What is numerical integration used for?",
       "strategy": "aggressive",
-      "latency_ms": 3092.2,
+      "latency_ms": 2901.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -934,7 +934,7 @@
     {
       "query": "Why is RK4 more accurate than Euler's method?",
       "strategy": "aggressive",
-      "latency_ms": 3068.1,
+      "latency_ms": 2891.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -947,7 +947,7 @@
     {
       "query": "What is Heun's method?",
       "strategy": "aggressive",
-      "latency_ms": 3083.4,
+      "latency_ms": 2905.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -960,7 +960,7 @@
     {
       "query": "How does Euler's method work?",
       "strategy": "aggressive",
-      "latency_ms": 3188.5,
+      "latency_ms": 2949.2,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -973,7 +973,7 @@
     {
       "query": "What is a first order ODE?",
       "strategy": "aggressive",
-      "latency_ms": 2957.7,
+      "latency_ms": 2899.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -986,7 +986,7 @@
     {
       "query": "What is Lagrange interpolation?",
       "strategy": "aggressive",
-      "latency_ms": 3405.2,
+      "latency_ms": 2868.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -999,7 +999,7 @@
     {
       "query": "When do I use Newton's forward difference?",
       "strategy": "aggressive",
-      "latency_ms": 3163.0,
+      "latency_ms": 2916.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1012,7 +1012,7 @@
     {
       "query": "What is divided difference?",
       "strategy": "aggressive",
-      "latency_ms": 2894.7,
+      "latency_ms": 2942.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1025,7 +1025,7 @@
     {
       "query": "What is the difference between forward and backward difference?",
       "strategy": "aggressive",
-      "latency_ms": 2927.8,
+      "latency_ms": 2906.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1038,7 +1038,7 @@
     {
       "query": "What is finite difference?",
       "strategy": "aggressive",
-      "latency_ms": 3033.2,
+      "latency_ms": 2949.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1051,7 +1051,7 @@
     {
       "query": "How do you compute a numerical derivative?",
       "strategy": "aggressive",
-      "latency_ms": 3078.4,
+      "latency_ms": 2880.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1064,7 +1064,7 @@
     {
       "query": "What is forward difference formula?",
       "strategy": "aggressive",
-      "latency_ms": 2897.1,
+      "latency_ms": 2899.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1077,7 +1077,7 @@
     {
       "query": "What is LU decomposition?",
       "strategy": "aggressive",
-      "latency_ms": 3015.3,
+      "latency_ms": 2882.0,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1090,7 +1090,7 @@
     {
       "query": "What is the Doolittle method?",
       "strategy": "aggressive",
-      "latency_ms": 3066.7,
+      "latency_ms": 2956.9,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1103,7 +1103,7 @@
     {
       "query": "How does back substitution work?",
       "strategy": "aggressive",
-      "latency_ms": 3036.9,
+      "latency_ms": 2919.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1116,7 +1116,7 @@
     {
       "query": "What is truncation error?",
       "strategy": "aggressive",
-      "latency_ms": 3055.6,
+      "latency_ms": 3066.6,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1129,7 +1129,7 @@
     {
       "query": "What is round-off error?",
       "strategy": "aggressive",
-      "latency_ms": 3004.0,
+      "latency_ms": 2895.4,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1142,7 +1142,7 @@
     {
       "query": "What is absolute vs relative error?",
       "strategy": "aggressive",
-      "latency_ms": 3081.7,
+      "latency_ms": 2965.5,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1155,7 +1155,7 @@
     {
       "query": "What is NumeriX?",
       "strategy": "aggressive",
-      "latency_ms": 2925.6,
+      "latency_ms": 2895.7,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
@@ -1168,7 +1168,7 @@
     {
       "query": "What topics does this app cover?",
       "strategy": "aggressive",
-      "latency_ms": 3134.2,
+      "latency_ms": 2899.1,
       "tokens_before": 0,
       "tokens_after": 0,
       "token_reduction_pct": 0,
