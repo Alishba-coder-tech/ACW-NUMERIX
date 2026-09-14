@@ -41,6 +41,7 @@ from routers.acw import adaptive_context_wrapper
 from modules.risk_aware_compression import RiskAwareCompression, CompressionLevel
 from modules.semantic_safety_guard import SemanticSafetyGuard
 from modules.context_recovery import ContextRecovery
+from modules.semantic_response_cache import semantic_cache
 
 router = APIRouter()
 
@@ -248,6 +249,25 @@ def _ensure_kb_seeded():
     _kb_seeded = True
 
 
+def _embed_query(query: str) -> List[float]:
+    return genai.embed_content(
+        model=EMBED_MODEL,
+        content=query,
+        task_type="retrieval_query",
+        output_dimensionality=EMBED_DIM,
+    )["embedding"]
+
+
+def _retrieve_by_embedding(q_embed: List[float], top_k: int = 3) -> List[dict]:
+    _ensure_kb_seeded()
+    index = _get_index()
+    results = index.query(vector=q_embed, top_k=top_k, include_metadata=True)
+    return [
+        {"id": m.id, "title": m.metadata.get("title", ""),
+         "content": m.metadata.get("content", ""), "score": m.score}
+        for m in results.matches
+    ]
+
 def _retrieve(query: str, top_k: int = 3) -> List[dict]:
     _ensure_kb_seeded()
     index = _get_index()
@@ -308,6 +328,8 @@ class ChatInput(BaseModel):
     # New: risk-aware pipeline controls (opt-in, default OFF)
     use_risk_aware: Optional[bool] = False
     max_recovery_attempts: Optional[int] = 1  # caps extra Gemini calls
+    use_cache: Optional[bool] = False
+    cache_threshold: Optional[float] = None
 
 
 @router.post("/ask")
@@ -322,9 +344,26 @@ def ask(data: ChatInput):
         for m in data.history or []:
             role = "model" if m.role == "assistant" else "user"
             history_payload.append({"role": role, "parts": [m.content]})
+        
+        q_embed = _embed_query(data.message)
+
+        if data.use_cache:
+            cached, similarity = semantic_cache.find_similar(q_embed, data.cache_threshold)
+            if cached is not None:
+                return {
+                    "reply": cached.answer,
+                    "sources": cached.sources,
+                    "acw_metrics": cached.acw_metrics,
+                    "risk_assessment": cached.risk_assessment,
+                    "safety_report": cached.safety_report,
+                    "recovery": cached.recovery,
+                    "from_cache": True,
+                    "cache_similarity": round(similarity, 4),
+                }
+            near_miss_similarity = round(similarity, 4)
 
         # Step 1: Retrieve from Pinecone
-        raw_chunks = _retrieve(data.message, top_k=3)
+        raw_chunks = _retrieve_by_embedding(q_embed, top_k=3)
 
         risk_assessment = None
         safety_report = None
@@ -407,13 +446,33 @@ def ask(data: ChatInput):
                     "score": round(score, 3),
                 })
                 budget -= 1
-
             recovery_info = {
                 "final_confidence": confidence.name,
                 "final_score": round(score, 3),
                 "recovery_attempts": attempts,
                 "recovered": len(attempts) > 0,
             }
+
+        if data.use_cache:
+            semantic_cache.add(
+                query=data.message,
+                embedding=q_embed,
+                answer=reply_text,
+                sources=[c["title"] for c in selected_chunks],
+                acw_metrics={
+                    "strategy": strategy,
+                    "chunks_retrieved": acw_metrics["chunks_retrieved"],
+                    "chunks_selected": acw_metrics["chunks_selected"],
+                    "tokens_before": acw_metrics["tokens_before"],
+                    "tokens_after": acw_metrics["tokens_after"],
+                    "token_reduction_pct": acw_metrics["token_reduction_pct"],
+                    "scoring_mode": acw_metrics.get("scoring_mode"),
+                    "alpha_used": acw_metrics.get("alpha_used"),
+                },
+                risk_assessment=risk_assessment,
+                safety_report=safety_report,
+                recovery=recovery_info,
+            )
 
         return {
             "reply": reply_text,
@@ -431,8 +490,9 @@ def ask(data: ChatInput):
             "risk_assessment": risk_assessment,
             "safety_report": safety_report,
             "recovery": recovery_info,
+            "from_cache": False,
+            "cache_similarity": near_miss_similarity if data.use_cache else None,
         }
-
     except HTTPException:
         raise
     except Exception as e:
