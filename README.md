@@ -8,11 +8,13 @@ ACW dynamically controls the amount of retrieved and conversational context prov
 
 An extended, **risk-aware** variant of ACW is also included, which adjusts compression aggressiveness per-query based on estimated risk, validates that compression didn't drop critical information before generation, and can retry with additional context if the generated answer's confidence is low.
 
+A **Semantic Response Cache** is also included to avoid unnecessary LLM calls by reusing previously generated answers for semantically similar queries.
+
 ## Strategies
 
 The core scoring function ranks retrieved chunks using a weighted combination of cosine similarity and information density:
 
-```
+```text
 combined_score = α · cosine_similarity + (1 − α) · information_density
 ```
 
@@ -48,16 +50,34 @@ Scores each generated answer's confidence (relevance, completeness, coherence, c
 
 Risk-aware mode is fully implemented and tested; it is opt-in per-request (not enabled by default) so that the core evaluation scripts above continue to exercise the fixed-strategy ACW path unaffected.
 
+## Semantic Response Cache
+
+The **Semantic Response Cache** reduces unnecessary LLM calls by reusing previously generated answers for semantically similar questions.
+
+### `modules/semantic_response_cache.py`
+
+The cache:
+
+* Stores questions, their semantic embeddings, and generated answers.
+* Persists cache entries in `semantic_cache.jsonl`.
+* Uses cosine similarity to compare a new query with cached queries.
+* Returns the stored answer when similarity exceeds the configured threshold.
+* Stores new answers when no suitable cached response is found.
+
+Caching is enabled using the `use_cache: true` flag on `/ask` and is disabled by default so that the existing evaluation experiments remain unaffected.
+
+The frontend is also integrated with the cache and indicates when a response was served from cache.
+
 ## Evaluation
 
 Four experiments are included, each independently runnable:
 
-| Script | Measures | Output |
-|---|---|---|
-| `run_experiment.py` | Tokens before/after, token reduction %, latency, chunks retrieved/selected, response length | `acw_experiment_results.json` |
-| `answer_quality.py` | Answer correctness, relevance, completeness, and faithfulness per strategy, via LLM-as-judge against the full knowledge base | `answer_quality_results.json`, `answer_quality_for_human_review.csv` |
-| `run_ablation.py` | Token reduction and answer quality across scoring configurations: cosine-only, density-only, and α ∈ {0.3, 0.5, 0.7, 0.9} | `ablation_results.json` |
-| `cost_analysis.py` | Measured token reduction converted into an estimated per-query and monthly API cost saving (pricing constant must be set/verified before citing) | printed summary |
+| Script              | Measures                                                                                                                                         | Output                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `run_experiment.py` | Tokens before/after, token reduction %, latency, chunks retrieved/selected, response length                                                      | `acw_experiment_results.json`                                        |
+| `answer_quality.py` | Answer correctness, relevance, completeness, and faithfulness per strategy, via LLM-as-judge against the full knowledge base                     | `answer_quality_results.json`, `answer_quality_for_human_review.csv` |
+| `run_ablation.py`   | Token reduction and answer quality across scoring configurations: cosine-only, density-only, and α ∈ {0.3, 0.5, 0.7, 0.9}                        | `ablation_results.json`                                              |
+| `cost_analysis.py`  | Measured token reduction converted into an estimated per-query and monthly API cost saving (pricing constant must be set/verified before citing) | printed summary                                                      |
 
 Each strategy/configuration is evaluated using the **same query set and retrieval configuration** to ensure a fair comparison.
 
@@ -81,10 +101,13 @@ python cost_analysis.py
 * Pinecone (vector retrieval)
 * React (frontend)
 * Retrieval-Augmented Generation (RAG)
+* Semantic embeddings and cosine similarity for response caching
 
 ## Research Objective
 
 The primary objective is to determine whether **adaptive context selection can reduce LLM context/token consumption without significantly affecting response quality**, and to characterize the token-reduction/answer-quality trade-off across scoring configurations (via the ablation study) and across query risk levels (via the risk-aware pipeline).
+
+The semantic response cache additionally evaluates whether **semantic answer reuse can reduce redundant LLM calls and improve response latency** for repeated or semantically similar queries.
 
 ## Project
 
@@ -104,11 +127,13 @@ numerix/backend/
 ├── acw_experiment_results_v2.json
 ├── answer_quality_results.json
 ├── answer_quality_for_human_review.csv
+├── semantic_cache.jsonl
 ├── modules/
 │   ├── __init__.py
 │   ├── risk_aware_compression.py
 │   ├── semantic_safety_guard.py
-│   └── context_recovery.py
+│   ├── context_recovery.py
+│   └── semantic_response_cache.py
 └── routers/
     ├── __init__.py
     ├── acw.py
@@ -121,4 +146,9 @@ numerix/backend/
     ├── linear.py
     ├── ode.py
     └── rootfinder.py
+
+frontend/
+└── src/
+    └── pages/
+        └── Chatbot.jsx
 ```
