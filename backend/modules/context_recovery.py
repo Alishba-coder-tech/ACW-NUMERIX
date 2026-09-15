@@ -320,6 +320,15 @@ class ContextRecovery:
             confidence_level in [ConfidenceLevel.CRITICAL, ConfidenceLevel.LOW] or
             score < threshold
         )
+
+    def should_abstain(
+        self,
+        confidence_level: ConfidenceLevel,
+        score: float,
+        threshold: float = 0.55
+    ) -> bool:
+        """Return whether the final answer lacks enough evidence to support a claim."""
+        return self.should_recover(confidence_level, score, threshold)
     
     def get_recovery_ladder(
         self,

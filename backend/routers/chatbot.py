@@ -84,6 +84,10 @@ COMPRESSION_TO_STRATEGY = {
 # Escalation order used by the recovery ladder: from most compressed to least.
 _STRATEGY_RANK = {"aggressive": 0, "moderate": 1, "baseline": 2}
 _ESCALATION_ORDER = ["aggressive", "moderate", "baseline"]
+ABSTENTION_REPLY = (
+    "I don't have enough reliable evidence in the available context to answer "
+    "that definitively. Please provide more details or rephrase the question."
+)
 
 
 def _next_strategies_above(strategy: str) -> List[str]:
@@ -446,14 +450,18 @@ def ask(data: ChatInput):
                     "score": round(score, 3),
                 })
                 budget -= 1
+            abstained = _recovery.should_abstain(confidence, score)
+            if abstained:
+                reply_text = ABSTENTION_REPLY
             recovery_info = {
                 "final_confidence": confidence.name,
                 "final_score": round(score, 3),
                 "recovery_attempts": attempts,
                 "recovered": len(attempts) > 0,
+                "abstained": abstained,
             }
 
-        if data.use_cache:
+        if data.use_cache and not (recovery_info and recovery_info.get("abstained")):
             semantic_cache.add(
                 query=data.message,
                 embedding=q_embed,

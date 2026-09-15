@@ -48,6 +48,11 @@ Scores each generated answer's confidence (relevance, completeness, coherence, c
 4. **Confidence evaluation** — the generated answer is scored on relevance, completeness, coherence, and confidence signals.
 5. **Recovery** — if confidence is low, the pipeline retries with progressively less compression, up to the retry budget.
 
+If the final response is still low-confidence after recovery is exhausted, the
+assistant abstains instead of returning an unsupported definitive answer. The
+response sets `recovery.abstained` to `true`, and abstentions are not added to
+the semantic response cache.
+
 Risk-aware mode is fully implemented and tested; it is opt-in per-request (not enabled by default) so that the core evaluation scripts above continue to exercise the fixed-strategy ACW path unaffected.
 
 ## Semantic Response Cache
