@@ -1,3 +1,11 @@
+> **Document control:** This file is the final test-results and verification
+> document for the Final Evidence Sufficiency Safeguard.
+>
+> **Prepared by:** Muhammad Abubakar<br>
+> **Project:** ACW-NUMERIX<br>
+> **Verification date:** 15 September 2026<br>
+> **Document status:** Final
+
 # Verification Report
 ## Final Evidence Sufficiency Safeguard
 
@@ -165,9 +173,28 @@ Add final evidence abstention safeguard
 | Pushed to `origin/main` | **PASS** |
 | Local working tree clean after push | **PASS** |
 
+### Commit clarification
+
+The verified feature implementation is recorded in commit `d0012b6`,
+`Add final evidence abstention safeguard`. This final verification document
+was subsequently committed and pushed in commit `6d000f4`,
+`Add detailed safeguard verification report`, on the same `main` branch.
+
+Both commits are present on `origin/main`.
+
 ## 10. Final Conclusion
 
 **PASS.** The system now has a final post-recovery safeguard that prevents
 low-evidence risk-aware responses from being presented as supported definitive
 answers. The behavior is covered by focused regression tests, syntax-checked,
 documented, committed, and published to GitHub.
+
+---
+
+## Verification Sign-Off
+
+**Prepared by:** Muhammad Abubakar<br>
+**Project:** ACW-NUMERIX<br>
+**Verification date:** 15 September 2026<br>
+**Status:** **PASS**<br>
+**Final report commit:** `6d000f4`
